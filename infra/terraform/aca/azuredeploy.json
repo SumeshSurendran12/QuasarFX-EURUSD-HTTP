@@ -4,17 +4,17 @@
   "parameters": {
     "namePrefix": {
       "type": "string",
-      "defaultValue": "qufxeurusd"
+      "defaultValue": "qufxeurusd",
+      "metadata": { "description": "Short, lowercase prefix for resource names." }
     },
     "location": {
       "type": "string",
-      "defaultValue": "[resourceGroup().location]"
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": { "description": "Azure region (e.g., eastus, eastus2)." }
     },
     "containerImage": {
       "type": "string",
-      "metadata": {
-        "description": "<acr>.azurecr.io/quasarfx-eurusd-http:live"
-      }
+      "metadata": { "description": "<yourACR>.azurecr.io/quasarfx-eurusd-http:live" }
     },
     "minReplicas": {
       "type": "int",
@@ -25,22 +25,18 @@
       "defaultValue": 3
     },
     "cpu": {
-      "type": "string",
-      "defaultValue": "0.5"
+      "type": "number",
+      "defaultValue": 0.5,
+      "metadata": { "description": "vCPU per replica (number)." }
     },
     "memory": {
       "type": "string",
-      "defaultValue": "1Gi"
+      "defaultValue": "1Gi",
+      "metadata": { "description": "Memory per replica (e.g., 0.5Gi, 1Gi, 2Gi)." }
     },
-    "fxUsername": {
-      "type": "securestring"
-    },
-    "fxPassword": {
-      "type": "securestring"
-    },
-    "fxAppKey": {
-      "type": "securestring"
-    }
+    "fxUsername": { "type": "securestring" },
+    "fxPassword": { "type": "securestring" },
+    "fxAppKey":   { "type": "securestring" }
   },
   "variables": {
     "lawName": "[format('{0}-log', parameters('namePrefix'))]",
@@ -56,9 +52,7 @@
       "name": "[variables('lawName')]",
       "location": "[parameters('location')]",
       "properties": {
-        "sku": {
-          "name": "PerGB2018"
-        },
+        "sku": { "name": "PerGB2018" },
         "retentionInDays": 30
       }
     },
@@ -85,21 +79,15 @@
       "apiVersion": "2019-05-01",
       "name": "[variables('acrName')]",
       "location": "[parameters('location')]",
-      "sku": {
-        "name": "Basic"
-      },
-      "properties": {
-        "adminUserEnabled": false
-      }
+      "sku": { "name": "Basic" },
+      "properties": { "adminUserEnabled": false }
     },
     {
       "type": "Microsoft.App/containerApps",
       "apiVersion": "2023-05-01",
       "name": "[variables('appName')]",
       "location": "[parameters('location')]",
-      "identity": {
-        "type": "SystemAssigned"
-      },
+      "identity": { "type": "SystemAssigned" },
       "properties": {
         "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('envName'))]",
         "configuration": {
@@ -110,18 +98,9 @@
             "allowInsecure": false
           },
           "secrets": [
-            {
-              "name": "fx-username",
-              "value": "[parameters('fxUsername')]"
-            },
-            {
-              "name": "fx-password",
-              "value": "[parameters('fxPassword')]"
-            },
-            {
-              "name": "fx-appkey",
-              "value": "[parameters('fxAppKey')]"
-            }
+            { "name": "fx-username", "value": "[parameters('fxUsername')]" },
+            { "name": "fx-password", "value": "[parameters('fxPassword')]" },
+            { "name": "fx-appkey",   "value": "[parameters('fxAppKey')]" }
           ],
           "registries": [
             {
@@ -137,16 +116,13 @@
               "name": "eurusd-http",
               "image": "[parameters('containerImage')]",
               "resources": {
-                "cpu": "[float(parameters('cpu'))]",
+                "cpu": "[parameters('cpu')]",
                 "memory": "[parameters('memory')]"
               },
               "probes": [
                 {
                   "type": "Liveness",
-                  "httpGet": {
-                    "path": "/healthz",
-                    "port": 80
-                  },
+                  "httpGet": { "path": "/healthz", "port": 80 },
                   "initialDelaySeconds": 10,
                   "periodSeconds": 10,
                   "timeoutSeconds": 3,
@@ -155,10 +131,7 @@
                 },
                 {
                   "type": "Readiness",
-                  "httpGet": {
-                    "path": "/readyz",
-                    "port": 80
-                  },
+                  "httpGet": { "path": "/readyz", "port": 80 },
                   "initialDelaySeconds": 15,
                   "periodSeconds": 15,
                   "timeoutSeconds": 5,
@@ -178,7 +151,8 @@
                   "type": "cpu",
                   "metadata": {
                     "type": "Utilization",
-                    "value": "70"
+                    "value": "70",
+                    "containerName": "eurusd-http"
                   }
                 }
               }
@@ -198,12 +172,22 @@
       "scope": "[resourceId('Microsoft.ContainerRegistry/registries', variables('acrName'))]",
       "properties": {
         "roleDefinitionId": "[variables('acrRoleId')]",
-        "principalId": "[reference(resourceId('Microsoft.App/containerApps', variables('appName')), '2023-05-01','full').identity.principalId]",
+        "principalId": "[reference(resourceId('Microsoft.App/containerApps', variables('appName')), '2023-05-01', 'full').identity.principalId]",
         "principalType": "ServicePrincipal"
       },
       "dependsOn": [
         "[resourceId('Microsoft.App/containerApps', variables('appName'))]"
       ]
     }
-  ]
+  ],
+  "outputs": {
+    "containerAppName": {
+      "type": "string",
+      "value": "[variables('appName')]"
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', variables('acrName')), '2019-05-01').loginServer]"
+    }
+  }
 }
