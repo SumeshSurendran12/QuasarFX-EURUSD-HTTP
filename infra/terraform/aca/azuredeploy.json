@@ -25,9 +25,9 @@
       "defaultValue": 3
     },
     "cpu": {
-      "type": "number",
-      "defaultValue": 0.5,
-      "metadata": { "description": "vCPU per replica (number)." }
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": { "description": "vCPU per replica as string; converted with float() in the template." }
     },
     "memory": {
       "type": "string",
@@ -116,7 +116,7 @@
               "name": "eurusd-http",
               "image": "[parameters('containerImage')]",
               "resources": {
-                "cpu": "[parameters('cpu')]",
+                "cpu": "[float(parameters('cpu'))]",
                 "memory": "[parameters('memory')]"
               },
               "probes": [
