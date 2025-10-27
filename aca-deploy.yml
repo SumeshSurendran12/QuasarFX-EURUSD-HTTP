@@ -1,0 +1,41 @@
+name: ACA Build & Deploy (HTTP + Probes)
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'eurusd_api.py'
+      - 'app.py'
+      - 'Dockerfile'
+      - 'infra/terraform/aca/azuredeploy.json'
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Vars
+        id: v
+        run: |
+          echo "PREFIX=qufxeurusd" >> $GITHUB_OUTPUT
+          echo "LOCATION=eastus" >> $GITHUB_OUTPUT
+      - name: Ensure ACR
+        run: |
+          az group create -n ${{ steps.v.outputs.PREFIX }}-rg -l ${{ steps.v.outputs.LOCATION }}
+          az acr show -n ${{ steps.v.outputs.PREFIX }}acr -g ${{ steps.v.outputs.PREFIX }}-rg ||               az acr create -n ${{ steps.v.outputs.PREFIX }}acr -g ${{ steps.v.outputs.PREFIX }}-rg --sku Basic
+          echo "ACR=$(az acr show -n ${{ steps.v.outputs.PREFIX }}acr -g ${{ steps.v.outputs.PREFIX }}-rg --query loginServer -o tsv)" >> $GITHUB_ENV
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.ACR }}/quasarfx-eurusd-http:live
+      - name: Deploy ARM
+        run: |
+          az deployment group create                 --resource-group ${{ steps.v.outputs.PREFIX }}-rg                 --template-file infra/terraform/aca/azuredeploy.json                 --parameters namePrefix=${{ steps.v.outputs.PREFIX }}                              location=${{ steps.v.outputs.LOCATION }}                              containerImage=${{ env.ACR }}/quasarfx-eurusd-http:live                              fxUsername='${{ secrets.FX_USERNAME }}'                              fxPassword='${{ secrets.FX_PASSWORD }}'                              fxAppKey='${{ secrets.FX_APP_KEY }}'
